@@ -2,6 +2,23 @@ from torchlm.models import pipnet
 from torchlm.data import LandmarksWFLWConverter, Landmarks300WConverter
 import os
 
+dataset_cfg = \
+    {
+        'wflw':
+            {
+                'ann_dir': 'WFLW',
+                'num_lms': 98
+            },
+        '300w':
+            {
+                'ann_dir': 'ibug_300W',
+                'num_lms': 68
+            }
+    }
+
+choose_ds = '300w'  # 'wflw' / '300w'
+freeze_backbone = False
+
 # ~~~~~~~~~~~~~~~~~~~~
 # ~~~ Convert data ~~~
 # ~~~~~~~~~~~~~~~~~~~~
@@ -32,20 +49,20 @@ if not os.path.exists(ibug_300w_save_dir) or not os.listdir(ibug_300w_save_dir):
 # ~~~~~~~~~~~~~~~~~~
 # ~~~ Load model ~~~
 # ~~~~~~~~~~~~~~~~~~
-model = pipnet(backbone="resnet18", pretrained=True, num_nb=10, num_lms=98, net_stride=32,
-               input_size=256, meanface_type="wflw", backbone_pretrained=True)
+model = pipnet(backbone="resnet18", pretrained=False, num_nb=10, num_lms=dataset_cfg[choose_ds]['num_lms'],
+               net_stride=32, input_size=256, meanface_type=choose_ds, backbone_pretrained=True)
 
 # ~~~~~~~~~~~~~~~~~~~
 # ~~~ Train model ~~~
 # ~~~~~~~~~~~~~~~~~~~
-freeze_backbone = True
 model.apply_freezing(backbone=freeze_backbone)
 model.apply_training(
-    annotation_path="./data/WFLW/converted/train.txt",  # or fine-tuning your custom data
+    annotation_path=os.path.join('./data', dataset_cfg[choose_ds]['ann_dir'], 'converted/train.txt'),
+    # or fine-tuning your custom data
     num_epochs=10,
     learning_rate=0.0001,
     save_dir="./save/pipnet",
-    save_prefix="pipnet-wflw-resnet18",
+    save_prefix="pipnet-" + choose_ds + "-resnet18",
     save_interval=10,
     logging_interval=1,
     device="cuda",
