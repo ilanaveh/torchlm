@@ -5,6 +5,8 @@ from torch import Tensor
 from math import floor
 from torch.utils.data import Dataset
 from typing import Tuple, Optional, List
+from PIL import ImageFilter  # IN: for GaussianBlur
+import torchvision.transforms as torch_transforms
 
 from .._utils import transforms, annotools
 
@@ -130,19 +132,32 @@ class _PIPEvalDataset(object):
     def __init__(
             self,
             annotation_path: str,
-            coordinates_already_normalized: Optional[bool] = False
+            coordinates_already_normalized: Optional[bool] = False,
+            input_size: int = 256,
+            blur: Optional[int] = None
     ):
         super(_PIPEvalDataset, self).__init__()
         self.annotation_path = annotation_path
         self.coordinates_already_normalized = coordinates_already_normalized
         self.annotations_info = \
             annotools.fetch_annotations(annotation_path=self.annotation_path)
+
         print(f"Built _PIPEvalDataset: eval count is {len(self)} !")
+
+        self.blur = blur
+        if self.blur:
+            self.transform = torch_transforms.Compose([torch_transforms.ToPILImage(), GaussianBlur(sigma=blur)])
+            print(f"Added blur transform (sigma={self.blur})")
+        else:
+            self.transform = None
 
     def __getitem__(self, index: int) -> Tuple[np.ndarray, np.ndarray]:  # img, lms_gt
         annotation_string = self.annotations_info[index]
         img_path, label = annotools.decode_annotation(annotation_string=annotation_string)
         img = cv2.imread(img_path)[:, :, ::-1]  # BGR -> RGB
+        if self.transform:
+            img = self.transform(img)
+            img = np.asarray(img)
         if self.coordinates_already_normalized:
             h, w, _ = img.shape
             label[:, 0] *= w
@@ -199,3 +214,30 @@ def _generate_labels(
             label_nb_y[num_nb * i + j, mu_y, mu_x] = nb_y
 
     return label_cls, label_x, label_y, label_nb_x, label_nb_y
+
+
+class GaussianBlur(object):
+    """Apply Gaussian blur filter with the given sigma to the input PIL Image.
+    Args:
+        sigma (int): Desired Gaussian blur level sigma
+
+    Taken from: W:\dannyh\work\code\PyTorch\vggface2_lookdir\datasets\custom_transforms.
+   """
+
+    def __init__(self, sigma):
+        assert isinstance(sigma, int)
+        self.sigma = sigma
+
+    def __call__(self, img):
+        """
+        Args:
+            img (PIL Image): Image to be scaled.
+        Returns:
+            PIL Image: Rescaled image.
+        """
+        img = img.filter(ImageFilter.GaussianBlur(radius=self.sigma))
+
+        return img
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(sigma={0})'.format(self.sigma)
