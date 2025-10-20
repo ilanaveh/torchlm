@@ -230,12 +230,14 @@ class _PIPNetImpl(nn.Module, LandmarksTrainableBase):
             norm_indices: List[int] = (60, 72),
             dataset_type: Optional[str] = None,
             coordinates_already_normalized: Optional[bool] = False,
-            eval_normalized_coordinates: Optional[bool] = False
+            eval_normalized_coordinates: Optional[bool] = False,
+            blur: Optional[int] = None
     ) -> Tuple[float, float, float]:  # NME, FR, AUC
         # prepare dataset
         eval_dataset = _PIPEvalDataset(
             annotation_path=annotation_path,
-            coordinates_already_normalized=coordinates_already_normalized
+            coordinates_already_normalized=coordinates_already_normalized,
+            blur=blur
         )
 
         return _evaluating_impl(
